@@ -694,9 +694,9 @@ def load_data(csv_path, sep=";"):
 # Ensure dataset is available (download from Google Drive if needed)
 csv_path = ensure_dataset_available()
 
-# with st.spinner("Cargando datos…"):
-#     st.markdown('<span class="loader"></span>Preparando tabla y filtros', unsafe_allow_html=True)
-#     df = load_data(csv_path, SEP)
+with st.spinner("Cargando datos…"):
+  # st.markdown('<span class="loader"></span>Preparando tabla y filtros', unsafe_allow_html=True)
+  df = load_data(csv_path, SEP)
 
 # =========================
 # 2) Completar lat/lon con centroides si es necesario
