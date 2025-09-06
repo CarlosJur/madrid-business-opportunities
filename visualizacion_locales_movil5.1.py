@@ -42,7 +42,7 @@ DISTRITO_PROP_KEY = "NOMBRE"
 # =========================
 @st.cache_data(show_spinner=True)
 def download_csv_from_drive(file_id, destination):
-    """Download CSV from Google Drive using file ID"""
+    """Download CSV from Google Drive using file ID, handling large files"""
     if file_id == "YOUR_FILE_ID_HERE":
         st.error("🚨 Please configure the Google Drive file ID in the code!")
         st.info("Steps to configure:")
@@ -55,24 +55,36 @@ def download_csv_from_drive(file_id, destination):
         """)
         st.stop()
     
-    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    # Use the direct download URL that bypasses the virus scan warning
+    url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
     
     try:
         with st.spinner("📥 Downloading dataset from Google Drive... This may take a moment."):
-            # Handle large files that might require confirmation
-            session = requests.Session()
-            response = session.get(url, stream=True)
+            # Use requests with proper headers for large files
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
             
-            # Check if we need to handle the download confirmation for large files
-            if 'confirm=' in response.url or response.status_code != 200:
-                # Try the direct download URL for large files
-                for key, value in response.cookies.items():
-                    if key.startswith('download_warning'):
-                        url = f"https://drive.google.com/uc?export=download&confirm={value}&id={file_id}"
-                        response = session.get(url, stream=True)
-                        break
-            
+            response = requests.get(url, headers=headers, stream=True)
             response.raise_for_status()
+            
+            # Check if we got HTML instead of CSV (virus scan page)
+            content_type = response.headers.get('content-type', '')
+            if 'text/html' in content_type:
+                # Try alternative URL for large files
+                url = f"https://drive.google.com/uc?id={file_id}&export=download&confirm=t"
+                response = requests.get(url, headers=headers, stream=True)
+                
+                # If still HTML, try the legacy download method
+                if 'text/html' in response.headers.get('content-type', ''):
+                    st.error("❌ Could not download the file automatically.")
+                    st.info("The file is too large for automatic download. Please:")
+                    st.markdown(f"""
+                    1. Click this link to download manually: [Download CSV](https://drive.google.com/file/d/{file_id}/view?usp=sharing)
+                    2. Save it as `{destination}` in your project folder
+                    3. Reload this app
+                    """)
+                    st.stop()
             
             # Download with progress indication
             total_size = int(response.headers.get('content-length', 0))
@@ -92,13 +104,20 @@ def download_csv_from_drive(file_id, destination):
             
             progress_bar.empty()
             status_text.empty()
+            
+            # Verify the file is actually a CSV
+            if os.path.getsize(destination) < 1000:  # Less than 1KB suggests an error
+                st.error("❌ Downloaded file is too small. Likely an error page.")
+                st.info("Please download the file manually and place it in your project folder.")
+                st.stop()
+            
             st.success("✅ Dataset downloaded successfully!")
             
         return destination
         
     except requests.exceptions.RequestException as e:
         st.error(f"❌ Failed to download dataset: {str(e)}")
-        st.info("Please check your internet connection and the Google Drive file ID.")
+        st.info("Please check your internet connection and try downloading manually.")
         st.stop()
     except Exception as e:
         st.error(f"❌ Unexpected error: {str(e)}")
