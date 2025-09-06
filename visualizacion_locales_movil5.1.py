@@ -28,8 +28,8 @@ CACHE_FILE = "geocode_cache.csv"
 CITY_DEFAULT = "Madrid"
 COUNTRY_DEFAULT = "España"
 
-# Google Drive file ID - REPLACE WITH YOUR ACTUAL FILE ID
-GOOGLE_DRIVE_FILE_ID = "14HcbItRNMbSxCbim5s0r9J7FJ6SrN7zW"  # Extract this from your Google Drive share link
+# Google Drive file ID - Your actual file ID
+GOOGLE_DRIVE_FILE_ID = "14HcbItRNMbSxCbim5s0r9J7FJ6SrN7zW"  # Madrid business opportunities CSV
 
 # GeoJSONs (en assets/)
 BARRIOS_GEOJSON_PATH = os.path.join("assets", "barrios_madrid.geojson")
@@ -655,15 +655,47 @@ if logo_path:
 def load_data(csv_path, sep=";"):
     df = pd.read_csv(csv_path, sep=sep, low_memory=False)
     
-    # Clean and rename coordinate columns to expected names
-    if 'latitude' in df.columns and 'longitude' in df.columns:
-        df = df.rename(columns={'latitude': 'lat', 'longitude': 'lon'})
+    # Debug: Show available columns
+    st.write("**Columns found in CSV:**", list(df.columns))
+    
+    # Look for coordinate columns with different possible names
+    coord_mapping = {
+        'latitude': 'lat',
+        'Latitude': 'lat', 
+        'LATITUDE': 'lat',
+        'lat_centroide': 'lat',
+        'latitud': 'lat',
+        'longitude': 'lon',
+        'Longitude': 'lon',
+        'LONGITUDE': 'lon', 
+        'lon_centroide': 'lon',
+        'longitud': 'lon'
+    }
+    
+    # Rename coordinate columns if found
+    for old_name, new_name in coord_mapping.items():
+        if old_name in df.columns:
+            df = df.rename(columns={old_name: new_name})
+            st.info(f"Renamed column '{old_name}' to '{new_name}'")
+    
+    # If still no lat/lon columns, create empty ones
+    if 'lat' not in df.columns:
+        df['lat'] = np.nan
+        st.warning("No latitude column found. Created empty 'lat' column.")
+    
+    if 'lon' not in df.columns:
+        df['lon'] = np.nan
+        st.warning("No longitude column found. Created empty 'lon' column.")
     
     # Convert coordinates to numeric, handling any potential issues
     if 'lat' in df.columns:
         df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
     if 'lon' in df.columns:
         df['lon'] = pd.to_numeric(df['lon'], errors='coerce')
+    
+    # Show coordinate info
+    valid_coords = df.dropna(subset=['lat', 'lon'])
+    st.info(f"Found {len(valid_coords)} rows with valid coordinates out of {len(df)} total rows")
     
     # Normalize text columns - adapted to your column names
     text_cols = ["desc_epigrafe", "desc_division", "desc_seccion",
