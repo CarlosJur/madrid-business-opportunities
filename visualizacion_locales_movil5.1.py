@@ -42,86 +42,50 @@ DISTRITO_PROP_KEY = "NOMBRE"
 # =========================
 @st.cache_data(show_spinner=True)
 def download_csv_from_drive(file_id, destination):
-    """Download CSV from Google Drive using file ID, handling large files"""
-    if file_id == "YOUR_FILE_ID_HERE":
-        st.error("🚨 Please configure the Google Drive file ID in the code!")
-        st.info("Steps to configure:")
-        st.markdown("""
-        1. Upload your CSV to Google Drive
-        2. Right-click → Share → Anyone with the link can view
-        3. Copy the share link (looks like: `https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing`)
-        4. Extract the file ID (the part between `/d/` and `/view`)
-        5. Replace `YOUR_FILE_ID_HERE` in the code with your actual file ID
-        """)
-        st.stop()
-    
-    # Use the direct download URL that bypasses the virus scan warning
-    url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
-    
-    try:
-        with st.spinner("📥 Downloading dataset from Google Drive... This may take a moment."):
-            # Use requests with proper headers for large files
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-            
-            response = requests.get(url, headers=headers, stream=True)
-            response.raise_for_status()
-            
-            # Check if we got HTML instead of CSV (virus scan page)
-            content_type = response.headers.get('content-type', '')
-            if 'text/html' in content_type:
-                # Try alternative URL for large files
-                url = f"https://drive.google.com/uc?id={file_id}&export=download&confirm=t"
-                response = requests.get(url, headers=headers, stream=True)
-                
-                # If still HTML, try the legacy download method
-                if 'text/html' in response.headers.get('content-type', ''):
-                    st.error("❌ Could not download the file automatically.")
-                    st.info("The file is too large for automatic download. Please:")
-                    st.markdown(f"""
-                    1. Click this link to download manually: [Download CSV](https://drive.google.com/file/d/{file_id}/view?usp=sharing)
-                    2. Save it as `{destination}` in your project folder
-                    3. Reload this app
-                    """)
-                    st.stop()
-            
-            # Download with progress indication
-            total_size = int(response.headers.get('content-length', 0))
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            with open(destination, 'wb') as f:
-                downloaded = 0
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        if total_size > 0:
-                            progress = downloaded / total_size
-                            progress_bar.progress(progress)
-                            status_text.text(f"Downloaded: {downloaded / (1024*1024):.1f} MB / {total_size / (1024*1024):.1f} MB")
-            
-            progress_bar.empty()
-            status_text.empty()
-            
-            # Verify the file is actually a CSV
-            if os.path.getsize(destination) < 1000:  # Less than 1KB suggests an error
-                st.error("❌ Downloaded file is too small. Likely an error page.")
-                st.info("Please download the file manually and place it in your project folder.")
-                st.stop()
-            
-            st.success("✅ Dataset downloaded successfully!")
-            
-        return destination
+    """Simple function to download CSV if it doesn't exist"""
+    if not os.path.exists(CSV_FILE):
+        st.info("📥 Dataset not found locally. Attempting download from Google Drive...")
         
-    except requests.exceptions.RequestException as e:
-        st.error(f"❌ Failed to download dataset: {str(e)}")
-        st.info("Please check your internet connection and try downloading manually.")
-        st.stop()
-    except Exception as e:
-        st.error(f"❌ Unexpected error: {str(e)}")
-        st.stop()
+        # Try multiple download URLs
+        urls_to_try = [
+            f"https://drive.usercontent.google.com/download?id={GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t",
+            f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t",
+            f"https://docs.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}&export=download"
+        ]
+        
+        success = False
+        for i, url in enumerate(urls_to_try):
+            try:
+                st.write(f"Trying download method {i+1}...")
+                response = requests.get(url, timeout=30)
+                
+                # Check if we got actual CSV data (not HTML error page)
+                if response.status_code == 200 and 'text/html' not in response.headers.get('content-type', ''):
+                    with open(CSV_FILE, 'wb') as f:
+                        f.write(response.content)
+                    
+                    # Verify file size
+                    if os.path.getsize(CSV_FILE) > 1000000:  # At least 1MB
+                        st.success("✅ Dataset downloaded successfully!")
+                        success = True
+                        break
+                    else:
+                        os.remove(CSV_FILE)  # Remove tiny file
+                        
+            except Exception as e:
+                st.write(f"Method {i+1} failed: {str(e)}")
+                continue
+        
+        if not success:
+            st.error("❌ Could not download the dataset automatically.")
+            st.markdown(f"""
+            **Manual download required:**
+            1. [Click here to download the CSV file](https://drive.google.com/file/d/{GOOGLE_DRIVE_FILE_ID}/view?usp=sharing)
+            2. Save it as `{CSV_FILE}` in your project folder
+            3. Reload this page
+            """)
+            st.stop()
+
 
 @st.cache_data
 def ensure_dataset_available():
