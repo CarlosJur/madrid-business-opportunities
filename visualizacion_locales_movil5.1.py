@@ -66,7 +66,7 @@ def download_csv_from_drive(file_id, destination):
                     
                     # Verify file size
                     if os.path.getsize(CSV_FILE) > 1000000:  # At least 1MB
-                        st.success("✅ Dataset downloaded successfully!")
+                        # st.success("✅ Dataset downloaded successfully!")
                         success = True
                         break
                     else:
@@ -91,7 +91,7 @@ def download_csv_from_drive(file_id, destination):
 def ensure_dataset_available():
     """Ensure the dataset is available locally, download if necessary"""
     if not os.path.exists(CSV_FILE):
-        st.info("📥 Dataset not found locally. Downloading from Google Drive...")
+        # st.info("📥 Dataset not found locally. Downloading from Google Drive...")
         download_csv_from_drive(GOOGLE_DRIVE_FILE_ID, CSV_FILE)
     
     # Verify file exists and is not empty
@@ -659,7 +659,7 @@ def load_data(csv_path, sep=";"):
     for old_name, new_name in coord_mapping.items():
         if old_name in df.columns:
             df = df.rename(columns={old_name: new_name})
-            st.info(f"Renamed column '{old_name}' to '{new_name}'")
+            # st.info(f"Renamed column '{old_name}' to '{new_name}'")
     
     # If still no lat/lon columns, create empty ones
     if 'lat' not in df.columns:
@@ -678,7 +678,7 @@ def load_data(csv_path, sep=";"):
     
     # Show coordinate info
     valid_coords = df.dropna(subset=['lat', 'lon'])
-    st.info(f"Found {len(valid_coords)} rows with valid coordinates out of {len(df)} total rows")
+    # st.info(f"Found {len(valid_coords)} rows with valid coordinates out of {len(df)} total rows")
     
     # Normalize text columns - adapted to your column names
     text_cols = ["desc_epigrafe", "desc_division", "desc_seccion",
@@ -694,9 +694,9 @@ def load_data(csv_path, sep=";"):
 # Ensure dataset is available (download from Google Drive if needed)
 csv_path = ensure_dataset_available()
 
-with st.spinner("Cargando datos…"):
-    st.markdown('<span class="loader"></span>Preparando tabla y filtros', unsafe_allow_html=True)
-    df = load_data(csv_path, SEP)
+# with st.spinner("Cargando datos…"):
+#     st.markdown('<span class="loader"></span>Preparando tabla y filtros', unsafe_allow_html=True)
+#     df = load_data(csv_path, SEP)
 
 # =========================
 # 2) Completar lat/lon con centroides si es necesario
