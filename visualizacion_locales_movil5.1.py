@@ -9,6 +9,7 @@ import unicodedata
 import base64, mimetypes
 from pathlib import Path
 from textwrap import dedent
+import requests
 
 import pandas as pd
 import numpy as np
@@ -27,11 +28,95 @@ CACHE_FILE = "geocode_cache.csv"
 CITY_DEFAULT = "Madrid"
 COUNTRY_DEFAULT = "España"
 
+# Google Drive file ID - REPLACE WITH YOUR ACTUAL FILE ID
+GOOGLE_DRIVE_FILE_ID = "YOUR_FILE_ID_HERE"  # Extract this from your Google Drive share link
+
 # GeoJSONs (en assets/)
 BARRIOS_GEOJSON_PATH = os.path.join("assets", "barrios_madrid.geojson")
 DISTRITOS_GEOJSON_PATH = os.path.join("assets", "distritos_madrid.geojson")
 BARRIO_PROP_KEY = "NOMBRE"
 DISTRITO_PROP_KEY = "NOMBRE"
+
+# =========================
+# GOOGLE DRIVE DOWNLOAD FUNCTION
+# =========================
+@st.cache_data(show_spinner=True)
+def download_csv_from_drive(file_id, destination):
+    """Download CSV from Google Drive using file ID"""
+    if file_id == "YOUR_FILE_ID_HERE":
+        st.error("🚨 Please configure the Google Drive file ID in the code!")
+        st.info("Steps to configure:")
+        st.markdown("""
+        1. Upload your CSV to Google Drive
+        2. Right-click → Share → Anyone with the link can view
+        3. Copy the share link (looks like: `https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing`)
+        4. Extract the file ID (the part between `/d/` and `/view`)
+        5. Replace `YOUR_FILE_ID_HERE` in the code with your actual file ID
+        """)
+        st.stop()
+    
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    
+    try:
+        with st.spinner("📥 Downloading dataset from Google Drive... This may take a moment."):
+            # Handle large files that might require confirmation
+            session = requests.Session()
+            response = session.get(url, stream=True)
+            
+            # Check if we need to handle the download confirmation for large files
+            if 'confirm=' in response.url or response.status_code != 200:
+                # Try the direct download URL for large files
+                for key, value in response.cookies.items():
+                    if key.startswith('download_warning'):
+                        url = f"https://drive.google.com/uc?export=download&confirm={value}&id={file_id}"
+                        response = session.get(url, stream=True)
+                        break
+            
+            response.raise_for_status()
+            
+            # Download with progress indication
+            total_size = int(response.headers.get('content-length', 0))
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            with open(destination, 'wb') as f:
+                downloaded = 0
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            progress = downloaded / total_size
+                            progress_bar.progress(progress)
+                            status_text.text(f"Downloaded: {downloaded / (1024*1024):.1f} MB / {total_size / (1024*1024):.1f} MB")
+            
+            progress_bar.empty()
+            status_text.empty()
+            st.success("✅ Dataset downloaded successfully!")
+            
+        return destination
+        
+    except requests.exceptions.RequestException as e:
+        st.error(f"❌ Failed to download dataset: {str(e)}")
+        st.info("Please check your internet connection and the Google Drive file ID.")
+        st.stop()
+    except Exception as e:
+        st.error(f"❌ Unexpected error: {str(e)}")
+        st.stop()
+
+@st.cache_data
+def ensure_dataset_available():
+    """Ensure the dataset is available locally, download if necessary"""
+    if not os.path.exists(CSV_FILE):
+        st.info("📥 Dataset not found locally. Downloading from Google Drive...")
+        download_csv_from_drive(GOOGLE_DRIVE_FILE_ID, CSV_FILE)
+    
+    # Verify file exists and is not empty
+    if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
+        return CSV_FILE
+    else:
+        st.error("❌ Dataset file is missing or empty!")
+        st.stop()
 
 # =========================
 # UTILIDADES
@@ -523,7 +608,7 @@ st.markdown("""
           <li>Tabla con zonas de <strong>baja competencia</strong> (potencial oportunidad).</li>
         </ul>
         <span style="font-size:.9rem; color:#325A6A;">
-          Fuente: Dataset municipal obtenido del portal de datos abiertos del Ayuntamiento de Madrid enrriquecido con coordenadas reales.
+          Fuente: Dataset municipal obtenido del portal de datos abiertos del Ayuntamiento de Madrid enriquecido con coordenadas reales.
         </span>
       </div>
     </div>
@@ -591,13 +676,12 @@ def load_data(csv_path, sep=";"):
     
     return df
 
-if not os.path.exists(CSV_FILE):
-    st.error(f"No encuentro el CSV `{CSV_FILE}` en esta carpeta.")
-    st.stop()
+# Ensure dataset is available (download from Google Drive if needed)
+csv_path = ensure_dataset_available()
 
 with st.spinner("Cargando datos…"):
     st.markdown('<span class="loader"></span>Preparando tabla y filtros', unsafe_allow_html=True)
-    df = load_data(CSV_FILE, SEP)
+    df = load_data(csv_path, SEP)
 
 # =========================
 # 2) Completar lat/lon con centroides si es necesario
