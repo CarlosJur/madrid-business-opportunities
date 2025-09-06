@@ -639,7 +639,7 @@ def load_data(csv_path, sep=";"):
     df = pd.read_csv(csv_path, sep=sep, low_memory=False)
     
     # Debug: Show available columns
-    st.write("**Columns found in CSV:**", list(df.columns))
+    # st.write("**Columns found in CSV:**", list(df.columns))
     
     # Look for coordinate columns with different possible names
     coord_mapping = {
