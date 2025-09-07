@@ -43,62 +43,77 @@ DISTRITO_PROP_KEY = "NOMBRE"
 @st.cache_data(show_spinner=True)
 def download_csv_from_drive(file_id, destination):
     """Simple function to download CSV if it doesn't exist"""
-    if not os.path.exists(CSV_FILE):
-        # st.info("📥 Dataset not found locally. Attempting download from Google Drive...") 
-        
-        # Try multiple download URLs
+    # Debug information
+    st.write(f"🔍 Looking for file at path: {os.path.abspath(destination)}")
+    st.write(f"📁 Current working directory: {os.getcwd()}")
+    st.write(f"📂 Current directory contents: {os.listdir(os.getcwd())}")
+
+    if not os.path.exists(destination):
+        st.info("📥 Dataset not found locally. Attempting download from Google Drive...")
+
         urls_to_try = [
-            f"https://drive.usercontent.google.com/download?id={GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t",
-            f"https://drive.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}&export=download&confirm=t",
-            f"https://docs.google.com/uc?id={GOOGLE_DRIVE_FILE_ID}&export=download"
+            f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t",
+            f"https://drive.google.com/uc?id={file_id}&export=download&confirm=t",
+            f"https://docs.google.com/uc?id={file_id}&export=download"
         ]
-        
+
         success = False
         for i, url in enumerate(urls_to_try):
             try:
                 st.write(f"Trying download method {i+1}...")
                 response = requests.get(url, timeout=30)
-                
-                # Check if we got actual CSV data (not HTML error page)
+
                 if response.status_code == 200 and 'text/html' not in response.headers.get('content-type', ''):
-                    with open(CSV_FILE, 'wb') as f:
+                    with open(destination, 'wb') as f:
                         f.write(response.content)
-                    
-                    # Verify file size
-                    if os.path.getsize(CSV_FILE) > 1000000:  # At least 1MB
-                        # st.success("✅ Dataset downloaded successfully!")
+
+                    if os.path.getsize(destination) > 1000000:  # At least 1MB
+                        st.success("✅ Dataset downloaded successfully!")
                         success = True
                         break
                     else:
-                        os.remove(CSV_FILE)  # Remove tiny file
-                        
+                        os.remove(destination)  # Remove tiny file
+
             except Exception as e:
                 st.write(f"Method {i+1} failed: {str(e)}")
                 continue
-        
+
         if not success:
             st.error("❌ Could not download the dataset automatically.")
             st.markdown(f"""
             **Manual download required:**
-            1. [Click here to download the CSV file](https://drive.google.com/file/d/{GOOGLE_DRIVE_FILE_ID}/view?usp=sharing)
-            2. Save it as `{CSV_FILE}` in your project folder
+            1. [Click here to download the CSV file](https://drive.google.com/file/d/{file_id}/view?usp=sharing)
+            2. Save it as `{destination}` in your project folder
             3. Reload this page
             """)
             st.stop()
-
+    else:
+        st.success(f"✅ File already exists at: {os.path.abspath(destination)}")
 
 @st.cache_data
 def ensure_dataset_available():
     """Ensure the dataset is available locally, download if necessary"""
+    # Debug information
+    st.write(f"🔍 Looking for CSV file: {CSV_FILE}")
+    st.write(f"📁 Full path: {os.path.abspath(CSV_FILE)}")
+    st.write(f"📂 Current working directory: {os.getcwd()}")
+    st.write(f"📄 Directory contents: {os.listdir(os.getcwd())}")
+
+    # Check for CSV files specifically
+    csv_files = [f for f in os.listdir(os.getcwd()) if f.endswith('.csv')]
+    st.write(f"📊 CSV files found: {csv_files}")
+
     if not os.path.exists(CSV_FILE):
-        # st.info("📥 Dataset not found locally. Downloading from Google Drive...")
+        st.info("📥 Dataset not found locally. Downloading from Google Drive...")
         download_csv_from_drive(GOOGLE_DRIVE_FILE_ID, CSV_FILE)
-    
+
     # Verify file exists and is not empty
     if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
+        file_size = os.path.getsize(CSV_FILE)
+        st.success(f"✅ Dataset ready: {CSV_FILE} ({file_size:,} bytes)")
         return CSV_FILE
     else:
-        st.error("❌ Dataset file is missing or empty!")
+        st.error(f"❌ Dataset file is missing or empty at: {os.path.abspath(CSV_FILE)}")
         st.stop()
 
 # =========================
@@ -147,10 +162,10 @@ def load_geojson(path, prop_key):
 def quantile_labels(s, q=[0, .25, .5, .75, 1.0], labels=("Muy baja", "Baja", "Media", "Alta")):
     if s.nunique() <= 1:
         return pd.Series(["Sin datos"] * len(s), index=s.index)
-    
+
     # Handle cases with very few unique values
     unique_vals = s.nunique()
-    
+
     try:
         return pd.qcut(s, q=q, duplicates="drop", labels=labels[:(len(q)-1)])
     except ValueError:
@@ -166,7 +181,7 @@ def quantile_labels(s, q=[0, .25, .5, .75, 1.0], labels=("Muy baja", "Baja", "Me
         else:
             # For other cases, try with fewer bins
             try:
-                return pd.qcut(s, q=min(unique_vals, 3), duplicates="drop", 
+                return pd.qcut(s, q=min(unique_vals, 3), duplicates="drop",
                              labels=["Baja", "Media", "Alta"][:min(unique_vals-1, 3)])
             except ValueError:
                 # Final fallback: simple binary classification
@@ -217,33 +232,33 @@ html("""
   --shadow-card: 0 6px 24px rgba(0,152,222,.08);
 }
 
-html, body, [class*="css"] { 
-  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
-  color: var(--text); 
+html, body, [class*="css"] {
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: var(--text);
 }
 
 [data-testid="stAppViewContainer"]{ background:var(--bg); }
 [data-testid="stHeader"]{ background:transparent; }
 [data-testid="stSidebar"]{ background:var(--bg-card); border-right:1px solid var(--border); }
 
-.sidebar-title{ 
-  font-weight:700; 
-  font-size:1rem; 
-  margin:.5rem 0 .25rem; 
-  color:var(--muted); 
-  letter-spacing:.02em; 
-  text-transform:uppercase; 
+.sidebar-title{
+  font-weight:700;
+  font-size:1rem;
+  margin:.5rem 0 .25rem;
+  color:var(--muted);
+  letter-spacing:.02em;
+  text-transform:uppercase;
 }
 
 h1,h2,h3,h4,h5, p, .stMarkdown, label { color:var(--text); }
 
 .stButton > button{
-  background:var(--waze-blue); 
-  border:1px solid var(--waze-blue-600); 
-  color:#fff; 
+  background:var(--waze-blue);
+  border:1px solid var(--waze-blue-600);
+  color:#fff;
   border-radius:12px;
-  padding:.55rem .9rem; 
-  font-weight:700; 
+  padding:.55rem .9rem;
+  font-weight:700;
   transition: filter .2s ease, transform .04s ease;
   box-shadow: 0 8px 18px rgba(0,152,222,.18);
 }
@@ -252,89 +267,89 @@ h1,h2,h3,h4,h5, p, .stMarkdown, label { color:var(--text); }
 .stButton > button:active{ transform: translateY(1px); }
 
 [data-baseweb="select"] > div,[data-baseweb="input"],[data-baseweb="textarea"]{
-  background:var(--bg-card)!important; 
-  color:var(--text)!important; 
-  border:1.5px solid var(--border)!important; 
-  border-radius:10px!important; 
+  background:var(--bg-card)!important;
+  color:var(--text)!important;
+  border:1.5px solid var(--border)!important;
+  border-radius:10px!important;
   box-shadow:none!important;
 }
 
-[data-baseweb="select"]:hover > div,[data-baseweb="input"]:hover,[data-baseweb="textarea"]:hover{ 
-  border-color:var(--waze-blue)!important; 
+[data-baseweb="select"]:hover > div,[data-baseweb="input"]:hover,[data-baseweb="textarea"]:hover{
+  border-color:var(--waze-blue)!important;
 }
 
 [data-baseweb="select"]:focus-within > div,[data-baseweb="input"]:focus-within,[data-baseweb="textarea"]:focus-within{
-  border-color:var(--waze-blue-600)!important; 
+  border-color:var(--waze-blue-600)!important;
   box-shadow:0 0 0 3px var(--focus)!important;
 }
 
 [data-baseweb="select"] svg{ fill:var(--muted); }
 
-.streamlit-expanderHeader{ 
-  background:#EAF7FF; 
-  border:1.5px solid var(--border); 
-  border-radius:12px; 
+.streamlit-expanderHeader{
+  background:#EAF7FF;
+  border:1.5px solid var(--border);
+  border-radius:12px;
 }
 
-div[data-testid="stAlert"]{ 
-  border:1.5px solid var(--waze-blue-600); 
-  border-radius:12px; 
-  color:#0B2530; 
+div[data-testid="stAlert"]{
+  border:1.5px solid var(--waze-blue-600);
+  border-radius:12px;
+  color:#0B2530;
 }
 
-.stDataFrame div[data-testid="stTable"], div[data-testid="stDataFrame"] div[role="grid"]{ 
-  border:1px solid var(--border); 
-  border-radius:8px; 
+.stDataFrame div[data-testid="stTable"], div[data-testid="stDataFrame"] div[role="grid"]{
+  border:1px solid var(--border);
+  border-radius:8px;
 }
 
-.loader { 
-  width:22px; 
-  height:22px; 
-  border-radius:50%; 
-  border:3px solid #9CA3AF; 
-  border-top-color:#374151; 
-  animation: spin 1s linear infinite; 
-  display:inline-block; 
-  vertical-align:middle; 
+.loader {
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  border:3px solid #9CA3AF;
+  border-top-color:#374151;
+  animation: spin 1s linear infinite;
+  display:inline-block;
+  vertical-align:middle;
   margin-right:.5rem;
 }
 
 @keyframes spin { to { transform: rotate(360deg);} }
 
-.card{ 
-  background:var(--bg-card); 
-  border:1px solid var(--border); 
-  border-radius:var(--radius); 
-  box-shadow: var(--shadow-card); 
+.card{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  box-shadow: var(--shadow-card);
 }
 
-.card .card-top{ 
-  height:4px; 
-  background:var(--grad-primary); 
-  border-radius:12px 12px 0 0; 
+.card .card-top{
+  height:4px;
+  background:var(--grad-primary);
+  border-radius:12px 12px 0 0;
 }
 
-.badge{ 
-  display:inline-block; 
-  padding:.3rem .6rem; 
-  border-radius:9999px; 
-  background:#E6F7FF; 
-  color:#05506B; 
-  font-weight:700; 
-  font-size:.75rem; 
+.badge{
+  display:inline-block;
+  padding:.3rem .6rem;
+  border-radius:9999px;
+  background:#E6F7FF;
+  color:#05506B;
+  font-weight:700;
+  font-size:.75rem;
 }
 
-.chip{ 
-  display:inline-flex; 
-  align-items:center; 
-  gap:.4rem; 
-  padding:.35rem .6rem; 
-  border:1px solid var(--border); 
-  border-radius:9999px; 
-  background:#F0FAFF; 
-  color:#05506B; 
-  font-weight:700; 
-  font-size:.75rem; 
+.chip{
+  display:inline-flex;
+  align-items:center;
+  gap:.4rem;
+  padding:.35rem .6rem;
+  border:1px solid var(--border);
+  border-radius:9999px;
+  background:#F0FAFF;
+  color:#05506B;
+  font-weight:700;
+  font-size:.75rem;
 }
 
 *::selection{ background:rgba(0,184,255,.18); }
@@ -342,10 +357,10 @@ div[data-testid="stAlert"]{
 /* MOBILE OPTIMIZATIONS */
 @media (max-width: 768px) {
   /* Hide logo on mobile */
-  a[aria-label="Ayuntamiento de Madrid (abre en nueva pestaña)"]{ 
-    display:none !important; 
+  a[aria-label="Ayuntamiento de Madrid (abre en nueva pestaña)"]{
+    display:none !important;
   }
-  
+
   /* Full-width sidebar on mobile when open */
   [data-testid="stSidebar"] {
     width: 100vw !important;
@@ -353,48 +368,48 @@ div[data-testid="stAlert"]{
     padding: 1rem !important;
     z-index: 999999 !important;
   }
-  
+
   /* Sidebar content adjustments */
   [data-testid="stSidebar"] > div {
     width: 100% !important;
     max-width: 100% !important;
   }
-  
+
   /* Hide main content when sidebar is open on mobile */
   [data-testid="stSidebar"][aria-expanded="true"] ~ [data-testid="stAppViewContainer"] {
     display: none !important;
   }
-  
+
   /* Mobile-friendly title */
-  h1 { 
-    font-size: 1.5rem !important; 
-    line-height: 1.3 !important; 
+  h1 {
+    font-size: 1.5rem !important;
+    line-height: 1.3 !important;
     margin-bottom: 1rem !important;
   }
-  
+
   /* Compact info card on mobile */
   .card {
     margin: 0.25rem 0 0.75rem !important;
   }
-  
+
   .card div[style*="padding:12px"] {
     padding: 8px 10px !important;
     gap: 8px !important;
   }
-  
+
   /* Smaller info icon */
   .card div[style*="min-width:34px"] {
     min-width: 28px !important;
     height: 28px !important;
     font-size: 0.8rem !important;
   }
-  
+
   .sidebar-title {
     font-size: 1rem !important;
     margin: 1rem 0 0.5rem !important;
     text-align: center !important;
   }
-  
+
   /* Mobile-friendly buttons in sidebar */
   [data-testid="stSidebar"] .stButton > button {
     padding: 0.75rem 1rem !important;
@@ -402,7 +417,7 @@ div[data-testid="stAlert"]{
     width: 100% !important;
     margin: 0.5rem 0 !important;
   }
-  
+
   /* Mobile-friendly selectboxes in sidebar - FIXED FOR LONG ACTIVITY NAMES */
   [data-testid="stSidebar"] [data-baseweb="select"] > div {
     font-size: 0.9rem !important;
@@ -413,7 +428,7 @@ div[data-testid="stAlert"]{
     height: auto !important;
     line-height: 1.3 !important;
   }
-  
+
   /* Activity selectbox specific styling for long names */
   [data-testid="stSidebar"] [data-baseweb="select"] [role="option"] {
     white-space: normal !important;
@@ -424,7 +439,7 @@ div[data-testid="stAlert"]{
     min-height: 44px !important;
     height: auto !important;
   }
-  
+
   /* Selected value in dropdown should wrap */
   [data-testid="stSidebar"] [data-baseweb="select"] [data-baseweb="select-value"] {
     white-space: normal !important;
@@ -433,76 +448,76 @@ div[data-testid="stAlert"]{
     text-overflow: unset !important;
     line-height: 1.3 !important;
   }
-  
+
   /* Dropdown container adjustments */
   [data-testid="stSidebar"] [data-baseweb="select"] [role="listbox"] {
     max-height: 300px !important;
     overflow-y: auto !important;
   }
-  
+
   /* Mobile-friendly checkboxes in sidebar */
   [data-testid="stSidebar"] .stCheckbox {
     margin: 1rem 0 !important;
   }
-  
+
   [data-testid="stSidebar"] .stCheckbox label {
     font-size: 1rem !important;
     padding: 0.5rem 0 !important;
   }
-  
+
   /* Sidebar expander adjustments */
   [data-testid="stSidebar"] .streamlit-expanderHeader {
     padding: 1rem !important;
     font-size: 1rem !important;
     min-height: 48px !important;
   }
-  
+
   /* Mobile-friendly buttons */
   .stButton > button {
     padding: 0.4rem 0.7rem !important;
     font-size: 0.9rem !important;
     width: 100% !important;
   }
-  
+
   /* Mobile-friendly selectboxes */
   [data-baseweb="select"] > div {
     font-size: 0.9rem !important;
     padding: 0.4rem 0.7rem !important;
   }
-  
+
   /* Compact expander */
   .streamlit-expanderHeader {
     padding: 0.5rem !important;
     font-size: 0.9rem !important;
   }
-  
+
   /* Mobile-friendly map */
   iframe[title="streamlit_folium.st_folium"] {
     height: 400px !important;
   }
-  
+
   /* Mobile table optimizations */
   .stDataFrame {
     font-size: 0.85rem !important;
   }
-  
+
   .stDataFrame div[data-testid="stTable"] {
     max-height: 400px !important;
     overflow-y: auto !important;
   }
-  
+
   /* Stack dataset info vertically on mobile */
   div:has(> p:contains("Dataset cargado")) p {
     font-size: 0.9rem !important;
     margin-bottom: 0.3rem !important;
   }
-  
+
   /* Mobile-friendly subheaders */
   h2, h3 {
     font-size: 1.2rem !important;
     margin-bottom: 0.5rem !important;
   }
-  
+
   /* Compact spacing */
   .block-container {
     padding: 1rem 0.5rem !important;
@@ -514,26 +529,26 @@ div[data-testid="stAlert"]{
   h1 {
     font-size: 1.3rem !important;
   }
-  
+
   .card div[style*="line-height:1.45"] {
     font-size: 0.85rem !important;
     line-height: 1.4 !important;
   }
-  
+
   .card ul {
     margin: 0.2rem 0 0.2rem 0.8rem !important;
     font-size: 0.8rem !important;
   }
-  
+
   /* Ultra-compact table for small screens */
   .stDataFrame div[data-testid="stTable"] {
     max-height: 300px !important;
   }
-  
+
   .stDataFrame {
     font-size: 0.8rem !important;
   }
-  
+
   /* Map adjustments for small screens */
   iframe[title="streamlit_folium.st_folium"] {
     height: 300px !important;
@@ -545,7 +560,7 @@ div[data-testid="stAlert"]{
   iframe[title="streamlit_folium.st_folium"] {
     height: 350px !important;
   }
-  
+
   .stDataFrame div[data-testid="stTable"] {
     max-height: 250px !important;
   }
@@ -557,12 +572,12 @@ div[data-testid="stAlert"]{
     min-height: 44px !important;
     padding: 0.6rem 1rem !important;
   }
-  
+
   [data-baseweb="select"] > div {
     min-height: 44px !important;
     padding: 0.6rem !important;
   }
-  
+
   .streamlit-expanderHeader {
     min-height: 44px !important;
     padding: 0.6rem !important;
@@ -578,8 +593,8 @@ st.markdown("""
   <div class="card-top"></div>
   <div style="display:flex; gap:12px; padding:12px 14px; align-items:flex-start;
               background:#F0FAFF; border-radius:0 0 var(--radius) var(--radius); border-top:0;">
-    <div style="min-width:34px; height:34px; border-radius:10px; 
-                background:var(--grad-primary); display:flex; align-items:center; justify-content:center; 
+    <div style="min-width:34px; height:34px; border-radius:10px;
+                background:var(--grad-primary); display:flex; align-items:center; justify-content:center;
                 color:#fff; font-weight:800;">i</div>
     <div style="line-height:1.45;">
       <div style="font-weight:700; color:#0B2530; margin-bottom:.25rem;">¿Qué estás viendo?</div>
@@ -637,58 +652,58 @@ if logo_path:
 @st.cache_data(show_spinner=True)
 def load_data(csv_path, sep=";"):
     df = pd.read_csv(csv_path, sep=sep, low_memory=False)
-    
+
     # Debug: Show available columns
     # st.write("**Columns found in CSV:**", list(df.columns))
-    
+
     # Look for coordinate columns with different possible names
     coord_mapping = {
         'latitude': 'lat',
-        'Latitude': 'lat', 
+        'Latitude': 'lat',
         'LATITUDE': 'lat',
         'lat_centroide': 'lat',
         'latitud': 'lat',
         'longitude': 'lon',
         'Longitude': 'lon',
-        'LONGITUDE': 'lon', 
+        'LONGITUDE': 'lon',
         'lon_centroide': 'lon',
         'longitud': 'lon'
     }
-    
+
     # Rename coordinate columns if found
     for old_name, new_name in coord_mapping.items():
         if old_name in df.columns:
             df = df.rename(columns={old_name: new_name})
             # st.info(f"Renamed column '{old_name}' to '{new_name}'")
-    
+
     # If still no lat/lon columns, create empty ones
     if 'lat' not in df.columns:
         df['lat'] = np.nan
         st.warning("No latitude column found. Created empty 'lat' column.")
-    
+
     if 'lon' not in df.columns:
         df['lon'] = np.nan
         st.warning("No longitude column found. Created empty 'lon' column.")
-    
+
     # Convert coordinates to numeric, handling any potential issues
     if 'lat' in df.columns:
         df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
     if 'lon' in df.columns:
         df['lon'] = pd.to_numeric(df['lon'], errors='coerce')
-    
+
     # Show coordinate info
     valid_coords = df.dropna(subset=['lat', 'lon'])
     # st.info(f"Found {len(valid_coords)} rows with valid coordinates out of {len(df)} total rows")
-    
+
     # Normalize text columns - adapted to your column names
     text_cols = ["desc_epigrafe", "desc_division", "desc_seccion",
-                "desc_barrio_local", "desc_distrito_local", 
+                "desc_barrio_local", "desc_distrito_local",
                 "clase_vial_edificio", "desc_vial_edificio", "rotulo"]
-    
+
     for col in text_cols:
         if col in df.columns:
             df[col] = df[col].apply(normalize_str)
-    
+
     return df
 
 # Ensure dataset is available (download from Google Drive if needed)
@@ -708,7 +723,7 @@ distritos_geo, distritos_index = load_geojson(DISTRITOS_GEOJSON_PATH, DISTRITO_P
 mask_centroid = df["lat"].isna() | df["lon"].isna()
 if mask_centroid.any() and (barrios_index or distritos_index):
     st.info(f"Completando {mask_centroid.sum():,} coordenadas faltantes usando centroides...")
-    
+
     # Try barrio centroids first
     if barrios_index:
         to_fill = df[mask_centroid].copy()
@@ -840,7 +855,7 @@ if show_points and ("lat" in df_plot.columns) and ("lon" in df_plot.columns):
     if len(pts) > 0:
         mc = MarkerCluster().add_to(m)
         popup_cols = [c for c in ["rotulo", "desc_epigrafe", "desc_barrio_local", "desc_distrito_local"] if c in df_plot.columns]
-        
+
         def build_popup(row):
             bits = []
             for c in popup_cols:
@@ -848,7 +863,7 @@ if show_points and ("lat" in df_plot.columns) and ("lon" in df_plot.columns):
                 if pd.notna(val) and str(val).strip():
                     bits.append(f"<b>{c.replace('_', ' ').title()}:</b> {str(val).title()}")
             return "<br>".join(bits) if bits else "Sin datos"
-        
+
         for _, r in pts.iterrows():
             try:
                 folium.Marker(
@@ -868,16 +883,16 @@ opcion = st.selectbox("Nivel de análisis", ["Barrio", "Distrito"], index=0)
 
 def compute_opportunities(level="Barrio"):
     level_col = "desc_barrio_local" if level == "Barrio" else "desc_distrito_local"
-    
+
     # Get all unique areas from the actual data (not just those with current business type)
     if level == "Barrio":
         all_areas_in_data = df["desc_barrio_local"].dropna().unique()
     else:
         all_areas_in_data = df["desc_distrito_local"].dropna().unique()
-    
+
     # Create a complete list with all areas from the dataset
     all_areas = pd.DataFrame({level_col: sorted(all_areas_in_data)})
-    
+
     # Get areas that have the selected business type
     if level == "Barrio" and grupo_barrio is not None:
         existing_areas = grupo_barrio.reset_index().rename(columns={"index": level_col})
@@ -885,20 +900,20 @@ def compute_opportunities(level="Barrio"):
         existing_areas = grupo_distrito.reset_index().rename(columns={"index": level_col})
     else:
         existing_areas = pd.DataFrame(columns=[level_col, "n_locales"])
-    
+
     # Merge ALL areas with business counts (areas with no businesses get 0)
     comp = all_areas.merge(existing_areas, how="left", on=level_col)
     comp["n_locales"] = comp["n_locales"].fillna(0).astype(int)
-    
+
     # Calculate categories for the complete dataset
     if len(comp) > 0 and comp["n_locales"].max() > 0:
         comp["categoria"] = quantile_labels(comp["n_locales"])
     else:
         comp["categoria"] = "Sin datos"
-    
+
     # Sort by number of competitors (ascending) so 0-competitor areas appear first
     comp = comp.sort_values(["n_locales", level_col], ascending=[True, True])
-    
+
     return comp[[level_col, "n_locales", "categoria"]]
 
 tabla_op = compute_opportunities(opcion)
@@ -906,7 +921,7 @@ st.dataframe(tabla_op, use_container_width=True, height=600)
 
 st.markdown("""
 **Interpretación**
-- **n_locales** = cuántos negocios de esta actividad hay en la zona.  
-- **Muy baja/Baja** = menor competencia → potencial oportunidad.  
+- **n_locales** = cuántos negocios de esta actividad hay en la zona.
+- **Muy baja/Baja** = menor competencia → potencial oportunidad.
 - **Alta** = mayor competencia → quizá menos atractivo para negocio de proximidad.
 """)
