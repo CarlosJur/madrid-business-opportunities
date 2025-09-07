@@ -44,7 +44,7 @@ DISTRITO_PROP_KEY = "NOMBRE"
 def download_csv_from_drive(file_id, destination):
     """Simple function to download CSV if it doesn't exist"""
     if not os.path.exists(CSV_FILE):
-        st.info("📥 Dataset not found locally. Attempting download from Google Drive...")
+        # st.info("📥 Dataset not found locally. Attempting download from Google Drive...") 
         
         # Try multiple download URLs
         urls_to_try = [
