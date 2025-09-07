@@ -43,10 +43,10 @@ DISTRITO_PROP_KEY = "NOMBRE"
 @st.cache_data(show_spinner=True)
 def download_csv_from_drive(file_id, destination):
     """Simple function to download CSV if it doesn't exist"""
-    # Debug information
-    st.write(f"🔍 Looking for file at path: {os.path.abspath(destination)}")
-    st.write(f"📁 Current working directory: {os.getcwd()}")
-    st.write(f"📂 Current directory contents: {os.listdir(os.getcwd())}")
+    # # Debug information
+    # st.write(f"🔍 Looking for file at path: {os.path.abspath(destination)}")
+    # st.write(f"📁 Current working directory: {os.getcwd()}")
+    # st.write(f"📂 Current directory contents: {os.listdir(os.getcwd())}")
 
     if not os.path.exists(destination):
         st.info("📥 Dataset not found locally. Attempting download from Google Drive...")
@@ -68,7 +68,7 @@ def download_csv_from_drive(file_id, destination):
                         f.write(response.content)
 
                     if os.path.getsize(destination) > 1000000:  # At least 1MB
-                        st.success("✅ Dataset downloaded successfully!")
+                        # st.success("✅ Dataset downloaded successfully!")
                         success = True
                         break
                     else:
@@ -93,15 +93,15 @@ def download_csv_from_drive(file_id, destination):
 @st.cache_data
 def ensure_dataset_available():
     """Ensure the dataset is available locally, download if necessary"""
-    # Debug information
-    st.write(f"🔍 Looking for CSV file: {CSV_FILE}")
-    st.write(f"📁 Full path: {os.path.abspath(CSV_FILE)}")
-    st.write(f"📂 Current working directory: {os.getcwd()}")
-    st.write(f"📄 Directory contents: {os.listdir(os.getcwd())}")
+    # # Debug information
+    # st.write(f"🔍 Looking for CSV file: {CSV_FILE}")
+    # st.write(f"📁 Full path: {os.path.abspath(CSV_FILE)}")
+    # st.write(f"📂 Current working directory: {os.getcwd()}")
+    # st.write(f"📄 Directory contents: {os.listdir(os.getcwd())}")
 
     # Check for CSV files specifically
     csv_files = [f for f in os.listdir(os.getcwd()) if f.endswith('.csv')]
-    st.write(f"📊 CSV files found: {csv_files}")
+    # st.write(f"📊 CSV files found: {csv_files}")
 
     if not os.path.exists(CSV_FILE):
         st.info("📥 Dataset not found locally. Downloading from Google Drive...")
@@ -110,7 +110,7 @@ def ensure_dataset_available():
     # Verify file exists and is not empty
     if os.path.exists(CSV_FILE) and os.path.getsize(CSV_FILE) > 0:
         file_size = os.path.getsize(CSV_FILE)
-        st.success(f"✅ Dataset ready: {CSV_FILE} ({file_size:,} bytes)")
+        # st.success(f"✅ Dataset ready: {CSV_FILE} ({file_size:,} bytes)")
         return CSV_FILE
     else:
         st.error(f"❌ Dataset file is missing or empty at: {os.path.abspath(CSV_FILE)}")
