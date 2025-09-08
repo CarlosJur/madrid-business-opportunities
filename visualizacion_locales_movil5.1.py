@@ -637,7 +637,11 @@ def embed_logo_top_center(path: str, width: int = 120, top_px: int = 8,
     <style>
         @media (max-width: 768px) {{
             a[aria-label="Ayuntamiento de Madrid (abre en nueva pestaña)"] {{
-                display: none !important;
+                left: 30% !important;
+                transform: translateX(0) !important;
+            }}
+            a[aria-label="Ayuntamiento de Madrid (abre en nueva pestaña)"] img {{
+                width: {int(width * 0.7)}px !important;
             }}
         }}
     </style>
