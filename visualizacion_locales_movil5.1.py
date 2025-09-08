@@ -49,7 +49,7 @@ def download_csv_from_drive(file_id, destination):
     # st.write(f"📂 Current directory contents: {os.listdir(os.getcwd())}")
 
     if not os.path.exists(destination):
-        st.info("📥 Dataset not found locally. Attempting download from Google Drive...")
+        # st.info("📥 Dataset not found locally. Attempting download from Google Drive...")
 
         urls_to_try = [
             f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t",
@@ -104,7 +104,7 @@ def ensure_dataset_available():
     # st.write(f"📊 CSV files found: {csv_files}")
 
     if not os.path.exists(CSV_FILE):
-        st.info("📥 Dataset not found locally. Downloading from Google Drive...")
+        # st.info("📥 Dataset not found locally. Downloading from Google Drive...")
         download_csv_from_drive(GOOGLE_DRIVE_FILE_ID, CSV_FILE)
 
     # Verify file exists and is not empty
@@ -587,7 +587,7 @@ div[data-testid="stAlert"]{
 """, height=0)
 
 # ---------- Título ----------
-st.title("🗺️ Identificador de oportunidades de negocio de proximidad\n(Ayuntamiento de Madrid)")
+st.title(" Identificador de oportunidades de negocio de proximidad\n(Ayuntamiento de Madrid) 🗺️ ")
 st.markdown("""
 <div class="card" style="margin:.5rem 0 1rem; padding:0;">
   <div class="card-top"></div>
@@ -634,6 +634,13 @@ def embed_logo_top_center(path: str, width: int = 120, top_px: int = 8,
                   border:1px solid var(--border); border-radius:10px;
                   box-shadow:0 2px 8px rgba(0,0,0,.08);" />
     </a>
+    <style>
+        @media (max-width: 768px) {{
+            a[aria-label="Ayuntamiento de Madrid (abre en nueva pestaña)"] {{
+                display: none !important;
+            }}
+        }}
+    </style>
     """)
 
 # Only show logo if file exists
@@ -652,6 +659,8 @@ if logo_path:
 @st.cache_data(show_spinner=True)
 def load_data(csv_path, sep=";"):
     df = pd.read_csv(csv_path, sep=sep, low_memory=False)
+
+    df = df.drop_duplicates(keep='first').reset_index(drop=True)
 
     # Debug: Show available columns
     # st.write("**Columns found in CSV:**", list(df.columns))
@@ -722,7 +731,7 @@ distritos_geo, distritos_index = load_geojson(DISTRITOS_GEOJSON_PATH, DISTRITO_P
 # Fill missing coordinates with centroids (barrio → distrito)
 mask_centroid = df["lat"].isna() | df["lon"].isna()
 if mask_centroid.any() and (barrios_index or distritos_index):
-    st.info(f"Completando {mask_centroid.sum():,} coordenadas faltantes usando centroides...")
+    # st.info(f"Completando {mask_centroid.sum():,} coordenadas faltantes usando centroides...")
 
     # Try barrio centroids first
     if barrios_index:
